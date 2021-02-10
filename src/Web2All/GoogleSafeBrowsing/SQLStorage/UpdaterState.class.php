@@ -9,27 +9,27 @@ Web2All_Manager_Main::loadClass('Web2All_Table_IListableObject');
  *
  * This class is for setting and retrieving updater state fields.
  *
- * @author Merijn van den Kroonenberg 
+ * @author Merijn van den Kroonenberg
  * @copyright (c) Copyright 2014 Web2All BV
- * @since 2014-12-24 
+ * @since 2014-12-24
  */
 class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_SaveObject implements Web2All_Table_IListableObject {
-  
+
   /**
-   * The field name 
+   * The field name
    *
-   * @var string 
+   * @var string
    */
   public $field;
-  
+
   /**
-   * the fields value 
+   * the fields value
    *
-   * @var int 
+   * @var int
    */
   public $value;
-  
-  
+
+
   /**
    * constructor
    *
@@ -38,19 +38,19 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_S
    */
   public function __construct(Web2All_Manager_Main $web2all,$db) {
     parent::__construct($web2all,$db);
-    
-    $this->tablename='updater_state';
-    
+
+    $this->tablename=Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['updater_state']['table_name'];
+
     $this->obj_to_db_trans=array(
-      'field' => 'upst_field',
-      'value' => 'upst_value',
- 
+      'field' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['updater_state']['field'],
+      'value' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['updater_state']['value'],
+
     );
-    
-    $this->key_properties=array('field');
-    
+
+    $this->key_properties=array($this->obj_to_db_trans['field']);
+
   }
-  
+
   /**
    * Load this object from the database by its (primary) key
    *
@@ -58,9 +58,9 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_S
    */
   public function loadFromDB($field)
   {
-    return $this->loadFromTable(array('upst_field' => $field));
+    return $this->loadFromTable(array($this->obj_to_db_trans['field'] => $field));
   }
-  
+
   /**
    * Check if this object has been successfully loaded from the
    * database. (we assume this is, when all key properties are set)
@@ -71,7 +71,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_S
   {
     return parent::isValid();
   }
-  
+
 
   /**
    * Initializes the Item object (properties) based on a assoc array with as keys the
@@ -83,11 +83,11 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_S
   {
     parent::loadFromDBArray($db_fields);
   }
-  
+
   /**
    * Method to query the table, based on the current values of the
    * objects properties.
-   * 
+   *
    * This method is required public when implementing
    * the Web2All_Table_IListableObject interface.
    *
@@ -100,7 +100,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState extends Web2All_Table_S
   {
     return parent::getRecordsetFromObjectQuery($extra,$limit,$offset);
   }
-  
+
   /**
    * get the adodb handle used by this object
    *

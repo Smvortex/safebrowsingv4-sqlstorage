@@ -10,41 +10,41 @@ Web2All_Manager_Main::loadClass('Web2All_Table_IListableObject');
  * This class is for storing and retrieving 4 byte hash prefixes in the database for hashes
  * which should not be in the list.
  *
- * @author Merijn van den Kroonenberg 
+ * @author Merijn van den Kroonenberg
  * @copyright (c) Copyright 2014 Web2All BV
- * @since 2014-12-24 
+ * @since 2014-12-24
  */
 class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Table_SaveObject implements Web2All_Table_IListableObject {
-  
+
   /**
-   * Hash prefix, hexadecimal notation of the first 4 bytes 
+   * Hash prefix, hexadecimal notation of the first 4 bytes
    *
-   * @var string 
+   * @var string
    */
   public $prefix;
-  
+
   /**
-   * Foreign key to list table 
+   * Foreign key to list table
    *
-   * @var int 
+   * @var int
    */
   public $lst_id;
-  
+
   /**
-   * ADD chunk number this hash prefix was in 
+   * ADD chunk number this hash prefix was in
    *
-   * @var int 
+   * @var int
    */
   public $add_chunk;
-  
+
   /**
-   * SUB chunk number this hash prefix was in 
+   * SUB chunk number this hash prefix was in
    *
-   * @var int 
+   * @var int
    */
   public $sub_chunk;
-  
-  
+
+
   /**
    * constructor
    *
@@ -53,21 +53,21 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Tabl
    */
   public function __construct(Web2All_Manager_Main $web2all,$db) {
     parent::__construct($web2all,$db);
-    
-    $this->tablename='hashes_4b_revoked';
-    
+
+    $this->tablename=Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['hashes_4b_revoked']['table_name'];
+
     $this->obj_to_db_trans=array(
-      'prefix' => 'hs4br_prefix',
-      'lst_id' => 'hs4br_lst_id',
-      'add_chunk' => 'hs4br_add_chunk',
-      'sub_chunk' => 'hs4br_sub_chunk',
- 
+      'prefix' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['hashes_4b_revoked']['prefix'],
+      'lst_id' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['hashes_4b_revoked']['lst_id'],
+      'add_chunk' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['hashes_4b_revoked']['add_chunk'],
+      'sub_chunk' => Web2All_GoogleSafeBrowsing_SQLStorage_Engine::$db_schema['hashes_4b_revoked']['sub_chunk'],
+
     );
-    
-    $this->key_properties=array('prefix','lst_id','add_chunk');
-    
+
+    $this->key_properties=array($this->obj_to_db_trans['prefix'],$this->obj_to_db_trans['lst_id'],$this->obj_to_db_trans['add_chunk']);
+
   }
-  
+
   /**
    * Load this object from the database by its (primary) key
    *
@@ -75,9 +75,9 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Tabl
    */
   public function loadFromDB($prefix,$lst_id,$add_chunk)
   {
-    return $this->loadFromTable(array('hs4br_prefix' => $prefix, 'hs4br_lst_id' => $lst_id, 'hs4br_add_chunk' => $add_chunk));
+    return $this->loadFromTable(array($this->obj_to_db_trans['prefix'] => $prefix, $this->obj_to_db_trans['lst_id'] => $lst_id, $this->obj_to_db_trans['add_chunk'] => $add_chunk));
   }
-  
+
   /**
    * Check if this object has been successfully loaded from the
    * database. (we assume this is, when all key properties are set)
@@ -88,7 +88,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Tabl
   {
     return parent::isValid();
   }
-  
+
 
   /**
    * Initializes the Item object (properties) based on a assoc array with as keys the
@@ -100,11 +100,11 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Tabl
   {
     parent::loadFromDBArray($db_fields);
   }
-  
+
   /**
    * Method to query the table, based on the current values of the
    * objects properties.
-   * 
+   *
    * This method is required public when implementing
    * the Web2All_Table_IListableObject interface.
    *
@@ -117,7 +117,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4bRevoked extends Web2All_Tabl
   {
     return parent::getRecordsetFromObjectQuery($extra,$limit,$offset);
   }
-  
+
   /**
    * get the adodb handle used by this object
    *

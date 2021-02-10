@@ -17,47 +17,86 @@ if ( !function_exists( 'hex2bin' ) ) {
 
 /**
  * GoogleSafeBrowsing SQLStorage class
- * 
+ *
  * This class im0plements a storage engine for GoogleSafeBrowsing, it stores everything
  * in SQL.
- * 
+ *
  * @author Merijn van den Kroonenberg
  * @copyright (c) Copyright 2014 Web2All BV
  * @since 2014-11-19
  */
 class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugin implements GoogleSafeBrowsing_Updater_IStorage, GoogleSafeBrowsing_Lookup_IStorage {
-  
+
   /**
    * The database handle
    *
    * @var ADOConnection
    */
   protected $db;
-  
+
   /**
    * Assoc array with key the list name and value the list id (for fast lookups)
    *
    * @var int[]
    */
   protected $list_ids;
-  
+
   /**
    * Assoc array with key the list name and value the list state
    *
    * @var string[]
    */
   protected $list_states;
-  
+
   /**
    * If verbose is true then debuglogging is on
    *
    * @var boolean
    */
   protected $verbose;
-  
+
+
+  public static $db_schema = array(
+    "hashes_4b" => array(
+      'table_name' => 'hashes_4b',
+      'prefix' => 'hs4b_prefix',
+      'lst_id' => 'hs4b_lst_id',
+      'long_prefix' => 'hs4b_long_prefix'),
+    "hashes_32b_full" => array(
+      'table_name' => 'hashes_32b_full',
+      'prefix' => 'hs32f_prefix',
+      'hash' => 'hs32f_hash',
+      'lst_id' => 'hs32f_lst_id',
+      'meta' => 'hs32f_meta',
+      'expire' => 'hs32f_expire'),
+    "hashes_4b_revoked" => array(
+      'table_name' => 'hashes_4b_revoked',
+      'prefix' => 'hs4br_prefix',
+      'lst_id' => 'hs4br_lst_id',
+      'add_chunk' => 'hs4br_add_chunk',
+      'sub_chunk' => 'hs4br_sub_chunk'),
+    "hashes_xb" => array(
+      'table_name' => 'hashes_xb',
+      'prefix' => 'hsxb_prefix',
+      'lst_id' => 'hsxb_lst_id',
+      'long_prefix' => 'hsxb_long_prefix'),
+    "list" => array(
+      'table_name' => 'list',
+      'id' => 'lst_id',
+      'name' => 'lst_name',
+      'description' => 'lst_description',
+      'state' => 'lst_state',
+      'last_updated' => 'lst_last_updated',
+      'last_reset' => 'lst_last_reset'),
+    "updater_state" => array(
+      'table_name' => 'updater_state',
+      'field' => 'upst_field',
+      'value' => 'upst_value',
+  ));
+
   /**
    * constructor
-   * 
+   *
    * @param Web2All_Manager_Main $web2all
    * @param ADOConnection $db
    */
@@ -68,20 +107,20 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     $this->updateListIDs();
     $this->verbose=$verbose;
   }
-  
+
   /**
    * Call this method to disable the default vebose mode
-   * 
+   *
    * @param boolean $quiet
    */
   public function setQuiet($quiet=true)
   {
     $this->verbose=!$quiet;
   }
-  
+
   /**
    * Updates the cached list id's from the database
-   * 
+   *
    */
   protected function updateListIDs()
   {
@@ -96,10 +135,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $this->list_states[$list->name]=$list->state;
     }
   }
-  
+
   /**
    * Log message (debug/informational)
-   * 
+   *
    * @param string $message
    */
   protected function debugLog($message)
@@ -108,22 +147,22 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $this->Web2All->debugLog('SQLStorage '.$message);
     }
   }
-  
+
   /**
    * Log message (warning/error)
-   * 
+   *
    * @param string $message
    */
   protected function warningLog($message)
   {
     $this->Web2All->debugLog('SQLStorage '.$message);
   }
-  
+
   // GoogleSafeBrowsing_Updater_IStorage methods
-  
+
   /**
    * Adds one or more hashprefixes
-   * 
+   *
    * @param string[] $prefixes
    * @param string $list
    */
@@ -156,7 +195,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
         $hasxbfilter->lst_id=$this->list_ids[$list];
         $hasxbfilter->prefix=$this->Web2All->Plugin->Web2All_Table_SQLOperation("'".$hash->prefix."%'",'LIKE');
         $longhashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectList($hasxbfilter);
-        $longhashprefixes->setExtra(' ORDER BY `hsxb_lst_id` ASC, `hsxb_prefix` ASC');
+        $longhashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_xb']['lst_id'].' ASC, '.self::$db_schema['hashes_xb']['prefix'].' ASC');
         if(count($longhashprefixes)>1){
           // okay, there are multiple long hashes for this 4byte hash prefix
           $hash->long_prefix=count($longhashprefixes);
@@ -179,10 +218,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $this->debugLog('addHashPrefixes() added '.count($prefixes).' prefixes ['.implode(',',array_map('bin2hex',$prefixes)).'] in list '.$list);
     }
   }
-  
+
   /**
    * Remove one or more hashprefixes
-   * 
+   *
    * @param string[] $prefixes
    * @param string $list
    * @param int $chunk
@@ -195,7 +234,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       trigger_error('Web2All_GoogleSafeBrowsing_SQLStorage_Engine->removeHashPrefixes: unknown list "'.$list.'"',E_USER_WARNING);
       return;
     }
-    
+
     foreach($prefixes as $prefix){
       $hash=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_Hashes4b($this->db);
       if(strlen($prefix)==4){
@@ -218,7 +257,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
         $hasxbfilter->lst_id=$this->list_ids[$list];
         $hasxbfilter->prefix=$this->Web2All->Plugin->Web2All_Table_SQLOperation("'".$hash->prefix."%'",'LIKE');
         $longhashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectList($hasxbfilter);
-        $longhashprefixes->setExtra(' ORDER BY `hsxb_lst_id` ASC, `hsxb_prefix` ASC');
+        $longhashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_xb']['lst_id'].' ASC, '.self::$db_schema['hashes_xb']['prefix'].' ASC');
         // re-sort them
         $counter=1;
         foreach($longhashprefixes as $longhashprefix){
@@ -242,10 +281,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $this->debugLog('removeHashPrefixes() removed '.count($prefixes).' prefixes ['.implode(',',array_map('bin2hex',$prefixes)).'] from list '.$list);
     }
   }
-  
+
   /**
    * Remove all prefixes of this list
-   * 
+   *
    * @param string $list
    */
   public function removeHashPrefixesFromList($list)
@@ -258,8 +297,8 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       trigger_error('Web2All_GoogleSafeBrowsing_SQLStorage_Engine->removeHashPrefixesFromList: unknown list "'.$list.'"',E_USER_WARNING);
       return;
     }
-    $this->db->Execute('DELETE FROM `hashes_4b` WHERE `hs4b_lst_id`=?',array($this->list_ids[$list]));
-    $this->db->Execute('DELETE FROM `hashes_xb` WHERE `hsxb_lst_id`=?',array($this->list_ids[$list]));
+    $this->db->Execute('DELETE FROM '.self::$db_schema['hashes_4b']['table_name'].' WHERE '.self::$db_schema['hashes_4b']['lst_id'].'=?',array($this->list_ids[$list]));
+    $this->db->Execute('DELETE FROM '.self::$db_schema['hashes_xb']['table_name'].' WHERE '.self::$db_schema['hashes_xb']['lst_id'].'=?',array($this->list_ids[$list]));
     // update list restet timestamp
     $list_obj=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_List($this->db);
     if($list_obj->loadFromDB($this->list_ids[$list])){
@@ -267,10 +306,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $list_obj->updateDB();
     }
   }
-  
+
   /**
    * Remove one or more hashprefixes
-   * 
+   *
    * @param int[] $indices
    * @param string $list
    * @return string[]  binary prefixes
@@ -285,13 +324,13 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       trigger_error('Web2All_GoogleSafeBrowsing_SQLStorage_Engine->removeHashPrefixesFromList: unknown list "'.$list.'"',E_USER_WARNING);
       return array();
     }
-    
+
     $prefixes=array();
-    
+
     $hashfilter->lst_id=$this->list_ids[$list];
     $hashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectIterator($hashfilter);
-    $hashprefixes->setExtra(' ORDER BY `hs4b_lst_id` ASC, `hs4b_prefix` ASC, `hs4b_long_prefix` ASC');
-    // there is a tradeoff, if the list of indices is more than a few, then its better to just 
+    $hashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_4b']['lst_id'].' ASC, '.self::$db_schema['hashes_4b']['prefix'].' ASC, '.self::$db_schema['hashes_4b']['long_prefix'].' ASC');
+    // there is a tradeoff, if the list of indices is more than a few, then its better to just
     // iterate (download) the whole sorted list and pick our indices from there
     if(count($indices)<10){
       foreach($indices as $index){
@@ -305,7 +344,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
             $hasxbfilter->prefix=$this->Web2All->Plugin->Web2All_Table_SQLOperation("'".$hash4b->prefix."%'",'LIKE');
             $hasxbfilter->long_prefix=$hash4b->long_prefix;
             $longhashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectList($hasxbfilter);
-            $longhashprefixes->setExtra(' ORDER BY `hsxb_lst_id` ASC, `hsxb_prefix` ASC');
+            $longhashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_xb']['lst_id'].' ASC, '.self::$db_schema['hashes_xb']['prefix'].' ASC');
             if(count($longhashprefixes)==1){
               $prefixes[]=hex2bin($longhashprefixes[0]->prefix);
             }
@@ -331,7 +370,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
             $hasxbfilter->prefix=$this->Web2All->Plugin->Web2All_Table_SQLOperation("'".$hash4b->prefix."%'",'LIKE');
             $hasxbfilter->long_prefix=$hash4b->long_prefix;
             $longhashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectList($hasxbfilter);
-            $longhashprefixes->setExtra(' ORDER BY `hsxb_lst_id` ASC, `hsxb_prefix` ASC');
+            $longhashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_xb']['lst_id'].' ASC, '.self::$db_schema['hashes_xb']['prefix'].' ASC');
             if(count($longhashprefixes)==1){
               $prefixes[]=hex2bin($longhashprefixes[0]->prefix);
             }
@@ -345,12 +384,12 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return $prefixes;
   }
-  
+
   /**
    * Get all lists and current state from the system
-   * 
+   *
    * return a assoc array with key the listname and value the state
-   * 
+   *
    * @return array
    */
   public function getLists()
@@ -363,12 +402,12 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return $return_lists;
   }
-  
+
   /**
    * Store the updated state for each list
-   * 
+   *
    * param is a assoc array with key the listname and value the state
-   * 
+   *
    * @param array $lists
    */
   public function updateLists($lists)
@@ -404,17 +443,17 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     // update our cache
     $this->updateListIDs();
   }
-  
+
   /**
    * Store the nextrun timestamp and errorcount, also clears the full hashes cache
-   * 
+   *
    * @param int $timestamp  nextrun timestamp
    * @param int $errorcount  how many consecutive errors did we have (if any)
    */
   public function setUpdaterState($timestamp, $errorcount)
   {
     $this->debugLog('setUpdaterState() called ('.$timestamp.', '.$errorcount.')');
-    
+
     $timestamp_obj=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState($this->db);
     if(!$timestamp_obj->loadFromDB('nextruntime')){
       // new, add it
@@ -426,7 +465,7 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       $timestamp_obj->value=$timestamp;
       $timestamp_obj->updateDB();
     }
-    
+
     $errorcount_obj=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_UpdaterState($this->db);
     if(!$errorcount_obj->loadFromDB('errorcount')){
       // new, add it
@@ -442,10 +481,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     $cache_table=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_Hashes32bFull($this->db);
     $cache_table->clearTable();
   }
-  
+
   /**
    * Retrieve the nextrun timestamp
-   * 
+   *
    * @return int
    */
   public function getNextRunTimestamp()
@@ -456,10 +495,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return (int)$timestamp->value;
   }
-  
+
   /**
    * Retrieve the amount of consecutive errors (0 if no errors)
-   * 
+   *
    * @return int
    */
   public function getErrorCount()
@@ -470,10 +509,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return (int)$errorcount->value;
   }
-  
+
   /**
    * Calculate checksum
-   * 
+   *
    * @param string $list
    * @param string $algo (sha256)
    * @return string  base64 encoded hash
@@ -487,10 +526,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       trigger_error('Web2All_GoogleSafeBrowsing_SQLStorage_Engine->getListChecksum: unknown list "'.$list.'"',E_USER_WARNING);
       return base64_encode(hash($algo,'',true));
     }
-    
+
     $hashfilter->lst_id=$this->list_ids[$list];
     $hashprefixes=$this->Web2All->Plugin->Web2All_Table_ObjectIterator($hashfilter);
-    $hashprefixes->setExtra(' ORDER BY `hs4b_lst_id` ASC, `hs4b_prefix` ASC, `hs4b_long_prefix` ASC');
+    $hashprefixes->setExtra(' ORDER BY '.self::$db_schema['hashes_4b']['lst_id'].' ASC, '.self::$db_schema['hashes_4b']['prefix'].' ASC, '.self::$db_schema['hashes_4b']['long_prefix'].' ASC');
     $data='';
     foreach($hashprefixes as $prefix){
       if($prefix->long_prefix==0){
@@ -511,12 +550,12 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return base64_encode(hash($algo,$data,true));
   }
-  
+
   // GoogleSafeBrowsing_Lookup_IStorage methods
-  
+
   /**
    * Lookup prefix for url hashes
-   * 
+   *
    * @param string[] $lookup_hashes
    * @return string[]  hashes with prefix present
    */
@@ -552,12 +591,12 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
     }
     return $found_hashes;
   }
-  
+
   /**
    * Lookup listnames for the given url hash
-   * 
+   *
    * Only do this for hashes for which a prefix was found!
-   * 
+   *
    * @param string $lookup_hash
    * @return string[]  list names or null if not cached
    */
@@ -565,14 +604,14 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
   {
     // full hash lookups
     $hexhash=bin2hex($lookup_hash);
-    
+
     // Note: we are not fully compliant with
     //   https://developers.google.com/safe-browsing/v4/caching
     // In order to be compliant, we should check for expired full hash matches
     // and return null when an expired full hash match is found. We should also
     // always store a negative cache (only prefix with expiration) and not remove
     // any expired full hash entries before the negative cache has expired.
-    
+
     // check if cached
     $full_hash_filter=$this->Web2All->Plugin->Web2All_GoogleSafeBrowsing_SQLStorage_Hashes32bFull($this->db);
     $full_hash_filter->prefix=substr($hexhash,0,8);
@@ -603,10 +642,10 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       return null;
     }
   }
-  
+
   /**
    * Add a full hash to the cache
-   * 
+   *
    * @param string $full_hash
    * @param string[] $lists  list names
    * @param string $meta
@@ -647,14 +686,14 @@ class Web2All_GoogleSafeBrowsing_SQLStorage_Engine extends Web2All_Manager_Plugi
       // is this correct? in what situation would we need negative caching, does it mean the prefix db is out of date? Does it actually ever happen?
       // I think to be 100% compliant with google's caching requirements
       // https://developers.google.com/safe-browsing/v4/caching
-      // we should be able to identify an expired cache hit. And we should always store 
+      // we should be able to identify an expired cache hit. And we should always store
       // negative caching records because negative and positive caching time can differ.
       $cached_hash->insertIntoDB(true);
       $this->debugLog('addHashInCache: prefix '.$cached_hash->prefix.' added negative caching');
     }
     return true;
   }
-  
+
 }
 
 ?>
